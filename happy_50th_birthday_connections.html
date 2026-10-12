@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy 50th Birthday Connections!</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Franklin+Gothic+Medium&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #ffffff;
+            color: #121212;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .nyt-header {
+            font-family: 'Libre Baskerville', Georgia, serif;
+        }
+
+        /* NYT Connections authentic category colors */
+        .bg-cat-yellow { background-color: #f9df6d; color: #000000; }
+        .bg-cat-green  { background-color: #a0c35a; color: #000000; }
+        .bg-cat-blue   { background-color: #b0c4ef; color: #000000; }
+        .bg-cat-purple { background-color: #ba81c5; color: #000000; }
+
+        /* Card selection transition & animations */
+        .card-btn {
+            transition: background-color 0.15s ease, transform 0.1s ease, color 0.15s ease, border-color 0.15s ease;
+            touch-action: manipulation;
+        }
+
+        .card-btn:active {
+            transform: scale(0.96);
+        }
+
+        .card-selected {
+            background-color: #5a595e !important;
+            color: #ffffff !important;
+        }
+
+        /* Shake animation for wrong guess */
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            15%, 45%, 75% { transform: translateX(-6px); }
+            30%, 60%, 90% { transform: translateX(6px); }
+        }
+        .animate-shake {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        /* Pop / Bounce animation for selected / correct reveal */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.06); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop {
+            animation: pop 0.3s ease-in-out;
+        }
+
+        /* Banner reveal animation */
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-banner {
+            animation: slideDown 0.4s ease-out forwards;
+        }
+
+        /* Toast notification */
+        #toast {
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between items-center bg-white px-4 py-6 sm:py-10">
+
+    <!-- Header -->
+    <header class="w-full max-w-xl text-center mb-6">
+        <h1 class="nyt-header text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 mb-2">
+            Happy 50th Birthday!
+        </h1>
+        <p class="text-sm sm:text-base text-gray-700 font-medium">
+            Create four groups of four!
+        </p>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="w-full max-w-xl flex-1 flex flex-col items-center">
+        
+        <!-- Toast Notification Box -->
+        <div id="toast" class="opacity-0 pointer-events-none fixed top-16 z-50 bg-black text-white px-5 py-2.5 rounded-md text-sm font-semibold shadow-lg transform -translate-y-2">
+            Already guessed!
+        </div>
+
+        <!-- Solved Categories Container -->
+        <div id="solved-container" class="w-full flex flex-col gap-2 mb-2"></div>
+
+        <!-- Interactive Grid -->
+        <div id="grid-container" class="w-full grid grid-cols-4 gap-2 sm:gap-2.5 mb-6"></div>
+
+        <!-- Mistakes Remaining Indicator -->
+        <div id="mistakes-container" class="flex items-center justify-center gap-2 mb-6 text-sm font-medium text-gray-700">
+            <span>Mistakes remaining:</span>
+            <div id="dots" class="flex gap-1.5 items-center">
+                <span class="w-3.5 h-3.5 bg-gray-700 rounded-full inline-block transition-transform duration-200"></span>
+                <span class="w-3.5 h-3.5 bg-gray-700 rounded-full inline-block transition-transform duration-200"></span>
+                <span class="w-3.5 h-3.5 bg-gray-700 rounded-full inline-block transition-transform duration-200"></span>
+                <span class="w-3.5 h-3.5 bg-gray-700 rounded-full inline-block transition-transform duration-200"></span>
+            </div>
+        </div>
+
+        <!-- Controls Buttons -->
+        <div id="controls" class="flex flex-wrap justify-center items-center gap-2 sm:gap-3 w-full">
+            <button id="btn-shuffle" onclick="shuffleCards()" class="px-5 py-3 rounded-full border border-gray-900 text-sm font-semibold hover:bg-gray-100 transition-colors active:scale-95">
+                Shuffle
+            </button>
+            <button id="btn-deselect" onclick="deselectAll()" class="px-5 py-3 rounded-full border border-gray-900 text-sm font-semibold hover:bg-gray-100 transition-colors active:scale-95 disabled:opacity-40 disabled:border-gray-300 disabled:hover:bg-transparent">
+                Deselect All
+            </button>
+            <button id="btn-submit" onclick="submitGuess()" class="px-6 py-3 rounded-full border border-gray-900 bg-gray-900 text-white text-sm font-semibold hover:bg-black transition-colors active:scale-95 disabled:opacity-40 disabled:bg-white disabled:text-gray-400 disabled:border-gray-300">
+                Submit
+            </button>
+        </div>
+
+        <!-- Celebration Modal / Banner on Win/Loss -->
+        <div id="game-over-modal" class="hidden w-full mt-6 p-6 rounded-2xl bg-gray-50 border border-gray-200 text-center animate-banner shadow-sm">
+            <h2 id="modal-title" class="text-2xl font-bold mb-2">🎉 Happy 50th Birthday! 🎉</h2>
+            <p id="modal-desc" class="text-gray-700 text-sm sm:text-base leading-relaxed mb-4">You solved all the connections!</p>
+            <button onclick="resetGame()" class="px-6 py-2.5 rounded-full bg-gray-900 text-white font-semibold text-sm hover:bg-black transition-colors">
+                Play Again
+            </button>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-8 text-center text-xs text-gray-400">
+        Custom NYT Connections Edition
+    </footer>
+
+    <script>
+        // Game Data Configuration
+        const CATEGORIES = [
+            {
+                id: 'yellow',
+                label: 'Family Members',
+                colorClass: 'bg-cat-yellow',
+                words: ['JEN', 'IAN', 'AMELIA', 'FINLAY'],
+                difficulty: 1
+            },
+            {
+                id: 'green',
+                label: 'Dogs',
+                colorClass: 'bg-cat-green',
+                words: ['SAMMY', 'HADLEY', 'DYLAN', 'MABEL'],
+                difficulty: 2
+            },
+            {
+                id: 'blue',
+                label: 'Music',
+                colorClass: 'bg-cat-blue',
+                words: ['FOO FIGHTERS', 'NIRVANA', 'GREEN DAY', 'OF MONSTERS AND MEN'],
+                difficulty: 3
+            },
+            {
+                id: 'purple',
+                label: 'Mummy',
+                colorClass: 'bg-cat-purple',
+                words: ['OCTOBER', 'BLUE', 'MUMMY', 'DOLPHINS'],
+                difficulty: 4
+            }
+        ];
+
+        // Game State Variables
+        let remainingCards = [];
+        let selectedCards = [];
+        let solvedCategories = [];
+        let mistakesLeft = 4;
+        let previousGuesses = new Set();
+        let isGameOver = false;
+
+        // Initialize Game
+        function initGame() {
+            selectedCards = [];
+            solvedCategories = [];
+            mistakesLeft = 4;
+            previousGuesses.clear();
+            isGameOver = false;
+
+            // Collect all words and shuffle
+            remainingCards = [];
+            CATEGORIES.forEach(cat => {
+                cat.words.forEach(word => {
+                    remainingCards.push({ word: word.toUpperCase(), catId: cat.id });
+                });
+            });
+
+            shuffleArray(remainingCards);
+
+            // Clear DOM
+            document.getElementById('solved-container').innerHTML = '';
+            document.getElementById('game-over-modal').classList.add('hidden');
+            document.getElementById('controls').classList.remove('hidden');
+            document.getElementById('mistakes-container').classList.remove('hidden');
+
+            renderMistakes();
+            renderGrid();
+            updateButtons();
+        }
+
+        // Render Cards in Grid
+        function renderGrid() {
+            const grid = document.getElementById('grid-container');
+            grid.innerHTML = '';
+
+            remainingCards.forEach((cardObj) => {
+                const isSelected = selectedCards.includes(cardObj.word);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `card-btn flex items-center justify-center text-center font-bold p-2 sm:p-3 rounded-lg bg-gray-100 border border-gray-200 text-xs sm:text-sm tracking-tight leading-tight uppercase min-h-[4rem] sm:min-h-[4.5rem] ${isSelected ? 'card-selected' : 'hover:bg-gray-200'}`;
+                btn.innerText = cardObj.word;
+                btn.onclick = () => toggleSelect(cardObj.word);
+                grid.appendChild(btn);
+            });
+        }
+
+        // Toggle Word Selection
+        function toggleSelect(word) {
+            if (isGameOver) return;
+
+            const index = selectedCards.indexOf(word);
+            if (index > -1) {
+                selectedCards.splice(index, 1);
+            } else {
+                if (selectedCards.length < 4) {
+                    selectedCards.push(word);
+                } else {
+                    return; // Max 4 selections
+                }
+            }
+            renderGrid();
+            updateButtons();
+        }
+
+        // Deselect All Cards
+        function deselectAll() {
+            selectedCards = [];
+            renderGrid();
+            updateButtons();
+        }
+
+        // Shuffle Active Grid
+        function shuffleCards() {
+            shuffleArray(remainingCards);
+            renderGrid();
+        }
+
+        // Helper: Fisher-Yates Shuffle
+        function shuffleArray(arr) {
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+        }
+
+        // Update Button States
+        function updateButtons() {
+            const btnSubmit = document.getElementById('btn-submit');
+            const btnDeselect = document.getElementById('btn-deselect');
+
+            btnSubmit.disabled = selectedCards.length !== 4 || isGameOver;
+            btnDeselect.disabled = selectedCards.length === 0 || isGameOver;
+        }
+
+        // Render Mistake Dots
+        function renderMistakes() {
+            const dotsContainer = document.getElementById('dots');
+            dotsContainer.innerHTML = '';
+            for (let i = 0; i < 4; i++) {
+                const dot = document.createElement('span');
+                dot.className = `w-3.5 h-3.5 rounded-full inline-block transition-all duration-300 ${
+                    i < mistakesLeft ? 'bg-gray-700 scale-100' : 'bg-gray-200 scale-75'
+                }`;
+                dotsContainer.appendChild(dot);
+            }
+        }
+
+        // Display Brief Toast Notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.innerText = message;
+            toast.classList.remove('opacity-0', '-translate-y-2', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-2', 'pointer-events-none');
+            }, 2000);
+        }
+
+        // Submit Guess Handler
+        function submitGuess() {
+            if (selectedCards.length !== 4 || isGameOver) return;
+
+            // Check if already guessed
+            const guessKey = [...selectedCards].sort().join(',');
+            if (previousGuesses.has(guessKey)) {
+                showToast('Already guessed!');
+                return;
+            }
+            previousGuesses.add(guessKey);
+
+            // Check if selected 4 match any category
+            let matchedCategory = null;
+            for (const cat of CATEGORIES) {
+                if (solvedCategories.some(s => s.id === cat.id)) continue;
+                
+                const isMatch = cat.words.every(w => selectedCards.includes(w.toUpperCase()));
+                if (isMatch) {
+                    matchedCategory = cat;
+                    break;
+                }
+            }
+
+            if (matchedCategory) {
+                // Correct Guess!
+                handleCorrectGuess(matchedCategory);
+            } else {
+                // Incorrect Guess
+                handleIncorrectGuess();
+            }
+        }
+
+        // Handle Correct Match
+        function handleCorrectGuess(category) {
+            solvedCategories.push(category);
+
+            // Remove solved words from remaining
+            remainingCards = remainingCards.filter(c => !category.words.includes(c.word));
+            selectedCards = [];
+
+            // Add Solved Category Banner
+            const solvedContainer = document.getElementById('solved-container');
+            const banner = document.createElement('div');
+            banner.className = `w-full py-4 px-3 rounded-xl ${category.colorClass} text-center animate-banner shadow-sm flex flex-col justify-center items-center my-0.5`;
+            banner.innerHTML = `
+                <div class="font-bold text-sm sm:text-base uppercase tracking-wider mb-0.5">${category.label}</div>
+                <div class="text-xs sm:text-sm font-medium tracking-normal opacity-90">${category.words.join(', ')}</div>
+            `;
+            solvedContainer.appendChild(banner);
+
+            renderGrid();
+            updateButtons();
+
+            // Check Win State
+            if (solvedCategories.length === 4) {
+                isGameOver = true;
+                setTimeout(() => {
+                    showWinScreen();
+                }, 400);
+            }
+        }
+
+        // Handle Incorrect Match
+        function handleIncorrectGuess() {
+            // Check for "One Away"
+            let isOneAway = false;
+            for (const cat of CATEGORIES) {
+                if (solvedCategories.some(s => s.id === cat.id)) continue;
+                const matchCount = cat.words.filter(w => selectedCards.includes(w.toUpperCase())).length;
+                if (matchCount === 3) {
+                    isOneAway = true;
+                    break;
+                }
+            }
+
+            if (isOneAway) {
+                showToast('One away...');
+            }
+
+            // Trigger Shake Animation on Grid
+            const grid = document.getElementById('grid-container');
+            grid.classList.add('animate-shake');
+            setTimeout(() => {
+                grid.classList.remove('animate-shake');
+            }, 500);
+
+            // Deplete Mistake
+            mistakesLeft--;
+            renderMistakes();
+
+            // Check Game Over Loss
+            if (mistakesLeft === 0) {
+                isGameOver = true;
+                setTimeout(() => {
+                    revealRemainingCategories();
+                }, 600);
+            }
+        }
+
+        // Reveal Remaining Categories on Loss
+        function revealRemainingCategories() {
+            CATEGORIES.forEach(cat => {
+                if (!solvedCategories.some(s => s.id === cat.id)) {
+                    handleCorrectGuess(cat);
+                }
+            });
+
+            document.getElementById('controls').classList.add('hidden');
+            const modal = document.getElementById('game-over-modal');
+            document.getElementById('modal-title').innerText = "Next time!";
+            document.getElementById('modal-desc').innerText = "Better luck next time! Happy 50th Birthday nonetheless! 🎉";
+            modal.classList.remove('hidden');
+        }
+
+        // Display Win Screen
+        function showWinScreen() {
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('mistakes-container').classList.add('hidden');
+            
+            const modal = document.getElementById('game-over-modal');
+            document.getElementById('modal-title').innerText = "🎉 Happy 50th Birthday! 🎉";
+            document.getElementById('modal-desc').innerText = "You solved all four custom Connections! Have a wonderful 50th Birthday celebration!";
+            modal.classList.remove('hidden');
+        }
+
+        // Reset Game
+        function resetGame() {
+            initGame();
+        }
+
+        // Start on page load
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
